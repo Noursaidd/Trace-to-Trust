@@ -1,7 +1,8 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { BarChart3, FileCheck, Package, QrCode, ShieldCheck, MapPin } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
+import { QrScanner } from '@/app/components/shared/QrScanner';
 import { Card } from '@/app/components/ui/card';
 import { OmaniPattern } from '@/app/components/shared/OmaniPattern';
 import { LanguageToggle } from '@/app/components/shared/LanguageToggle';
@@ -29,6 +30,8 @@ const categories = [
 
 export function LandingPage() {
   const { t } = useI18n();
+  const navigate = useNavigate();
+  const [showScanner, setShowScanner] = useState(false);
 
   const steps = [
     {
@@ -75,11 +78,14 @@ export function LandingPage() {
             <h1 className="mb-6 text-4xl font-bold text-slate-900 dark:text-slate-100 md:text-6xl">{t('landing.hero.title')}</h1>
             <p className="mx-auto mb-8 max-w-2xl text-xl text-slate-600 dark:text-slate-300">{t('landing.hero.desc')}</p>
             <div className="flex flex-col justify-center gap-4 sm:flex-row">
-              <Button asChild size="lg" className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400">
-                <Link to="/verify/LBL-HNY-NIZ-001">
-                  <QrCode className="mr-2 h-5 w-5" />
-                  {t('landing.hero.scan')}
-                </Link>
+              <Button
+                size="lg"
+                onClick={() => setShowScanner(true)}
+                className="relative overflow-hidden bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30 hover:from-blue-700 hover:to-blue-800 dark:from-blue-500 dark:to-blue-600"
+              >
+                <span className="absolute inset-0 animate-pulse rounded-md bg-white/10" />
+                <QrCode className="mr-2 h-5 w-5" />
+                {t('landing.hero.scan')}
               </Button>
               <Button asChild size="lg" variant="outline" className="border-slate-300 dark:border-slate-700 dark:bg-slate-900/50">
                 <Link to="/admin">
@@ -198,6 +204,17 @@ export function LandingPage() {
           </div>
         </div>
       </footer>
+
+      {/* QR Scanner Modal */}
+      {showScanner && (
+        <QrScanner
+          onScan={(code) => {
+            setShowScanner(false);
+            navigate(`/verify/${code}`);
+          }}
+          onClose={() => setShowScanner(false)}
+        />
+      )}
     </div>
   );
 }
