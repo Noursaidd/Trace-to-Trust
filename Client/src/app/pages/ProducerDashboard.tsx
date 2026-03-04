@@ -618,7 +618,6 @@ function GenerateLabelsTab() {
     }
   }
 
-  const base = window.location.origin.replace(String(8080), '8081');
 
   return (
     <div className="space-y-6">
@@ -663,7 +662,7 @@ function GenerateLabelsTab() {
                   <div className="font-mono text-xs">{l.code}</div>
                   <a
                     className="text-sm text-blue-600 dark:text-blue-300"
-                    href={`${base}/api/labels/${encodeURIComponent(l.code)}/qr`}
+                    href={`/api/labels/${encodeURIComponent(l.code)}/qr`}
                     target="_blank"
                     rel="noreferrer"
                   >

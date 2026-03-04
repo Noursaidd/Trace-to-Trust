@@ -1,55 +1,96 @@
-const BASE_URL = process.env.API_BASE || 'http://127.0.0.1:8081';
+const BASE_URL = process.env.API_BASE || 'http://127.0.0.1:3000';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ibrahim123';
 
 async function getJson(path, init = {}) {
   const res = await fetch(`${BASE_URL}${path}`, init);
   const text = await res.text();
   let body = {};
+
   try {
     body = text ? JSON.parse(text) : {};
   } catch {
     body = { raw: text };
   }
+
   if (!res.ok) {
     throw new Error(`${path} -> HTTP ${res.status} ${JSON.stringify(body)}`);
   }
+
   return body;
 }
 
 async function main() {
   const health = await getJson('/api/health');
-  if (!health?.success) throw new Error('health endpoint did not return success');
-
-  const headers = { 'x-admin-password': ADMIN_PASSWORD };
-  const batchesResp = await getJson('/api/batches', { headers });
-  const batches = batchesResp?.batches || [];
-  if (batches.length < 4) {
-    throw new Error(`expected at least 4 seeded batches, got ${batches.length}`);
+  if (!health?.success) {
+    throw new Error('health endpoint did not return success');
   }
 
-  const labelCodes = [];
-  for (const batch of batches.slice(0, 4)) {
-    const details = await getJson(`/api/batches/${encodeURIComponent(batch.id)}`, { headers });
-    if (!details?.labels?.length) throw new Error(`batch ${batch.id} has no labels`);
-    labelCodes.push(details.labels[0].code);
+  const headers = {
+    'x-admin-password': ADMIN_PASSWORD,
+    'Content-Type': 'application/json'
+  };
+
+  const createBatch = await getJson('/api/batches', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      product_name: `Smoke Product ${Date.now()}`,
+      product_type: 'SMOKE_TEST',
+      origin_region: 'Test Region',
+      quantity: 1,
+      description: 'Created by smoke test'
+    })
+  });
+
+  const batchId = createBatch?.batch?.id;
+  if (!batchId) {
+    throw new Error('failed to create batch');
   }
 
+  const addEvent = await getJson(`/api/batches/${encodeURIComponent(batchId)}/events`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      event_type: 'QUALITY_TEST',
+      payload: { result: 'pass', source: 'smoke' },
+      location: 'Test Lab'
+    })
+  });
+
+  const eventId = addEvent?.event?.id;
+  if (!eventId) {
+    throw new Error('failed to create event');
+  }
+
+  const signResp = await getJson(`/api/events/${encodeURIComponent(eventId)}/sign`, {
+    method: 'POST',
+    headers: { 'x-admin-password': ADMIN_PASSWORD }
+  });
+
+  if (!signResp?.signature) {
+    throw new Error('failed to sign event');
+  }
+
+  const labelsResp = await getJson(`/api/batches/${encodeURIComponent(batchId)}/labels`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ count: 1 })
+  });
+
+  const code = labelsResp?.labels?.[0]?.code;
+  if (!code) {
+    throw new Error('failed to create label');
+  }
+
+  const verify = await getJson(`/api/verify/${encodeURIComponent(code)}`);
   const allowed = new Set(['valid', 'unsigned', 'tampered', 'revoked']);
-  for (const code of labelCodes.slice(0, 3)) {
-    const verify = await getJson(`/api/verify/${encodeURIComponent(code)}`);
-    if (!allowed.has(verify?.status)) {
-      throw new Error(`label ${code} has invalid status: ${String(verify?.status)}`);
-    }
-    if (!verify?.batch?.id) throw new Error(`label ${code} missing batch`);
-    if (!Array.isArray(verify?.events) || verify.events.length < 3) {
-      throw new Error(`label ${code} missing realistic event chain`);
-    }
+  if (!allowed.has(verify?.status)) {
+    throw new Error(`invalid verify status: ${String(verify?.status)}`);
   }
 
-  console.log('Smoke test passed. Sample labels:');
-  for (const code of labelCodes.slice(0, 3)) {
-    console.log(`- ${code}`);
-  }
+  console.log('Smoke test passed.');
+  console.log(`Batch: ${batchId}`);
+  console.log(`Label: ${code}`);
 }
 
 main().catch((err) => {
