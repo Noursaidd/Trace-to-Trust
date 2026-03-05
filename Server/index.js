@@ -1,5 +1,8 @@
 const fs = require('fs');
 const path = require('path');
+const dns = require('dns');
+dns.setDefaultResultOrder('verbatim');
+dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');

@@ -28,7 +28,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { StatsCard } from '@/app/components/shared/StatsCard';
 import { LanguageToggle } from '@/app/components/shared/LanguageToggle';
 import { ThemeToggle } from '@/app/components/shared/ThemeToggle';
-import { api, getAdminPassword, setAdminPassword } from '@/app/lib/api';
+import { api } from '@/app/lib/api';
 import { translateEventType, translateProductType, useI18n } from '@/app/lib/i18n';
 import { cn } from '@/app/components/ui/utils';
 
@@ -64,11 +64,7 @@ type AdminStats = {
 };
 
 export function ProducerDashboard() {
-  return (
-    <AdminGate>
-      <DashboardShell />
-    </AdminGate>
-  );
+  return <DashboardShell />;
 }
 
 function DashboardShell() {
@@ -163,43 +159,6 @@ function DashboardShell() {
   );
 }
 
-function AdminGate({ children }: { children: React.ReactNode }) {
-  const { t } = useI18n();
-  const [pw, setPw] = useState(getAdminPassword());
-  const [ok, setOk] = useState<boolean>(!!pw);
-  const [err, setErr] = useState<string>('');
-
-  async function test() {
-    setErr('');
-    try {
-      setAdminPassword(pw);
-      await api.adminStats();
-      setOk(true);
-    } catch {
-      setOk(false);
-      setErr(t('dashboard.wrongPassword'));
-    }
-  }
-
-  if (!ok) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-slate-50 via-white to-blue-50 p-6 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-        <Card className="w-full max-w-xl rounded-2xl border-slate-200 bg-white/90 p-6 shadow-lg dark:border-slate-800 dark:bg-slate-900/85">
-          <h2 className="mb-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{t('dashboard.loginTitle')}</h2>
-          <p className="mb-4 text-slate-600 dark:text-slate-300">{t('dashboard.loginDesc')}</p>
-          <div className="space-y-2">
-            <Label htmlFor="adminpw">{t('dashboard.password')}</Label>
-            <Input id="adminpw" type="password" value={pw} onChange={(e) => setPw(e.target.value)} />
-            {err && <p className="text-sm text-rose-600 dark:text-rose-400">{err}</p>}
-            <Button onClick={test}>{t('dashboard.unlock')}</Button>
-          </div>
-        </Card>
-      </div>
-    );
-  }
-
-  return <>{children}</>;
-}
 
 function OverviewTab() {
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -697,7 +656,6 @@ function RevokeBatchTab() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-password': getAdminPassword(),
         },
         body: JSON.stringify({ reason }),
       });
