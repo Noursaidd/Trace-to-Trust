@@ -121,7 +121,6 @@ function DashboardShell() {
                 <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('app.name')}</div>
               </div>
               <div className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('dashboard.panel')}</div>
-              <div className="text-xs text-slate-500 dark:text-slate-400">{t('dashboard.panelDesc')}</div>
             </div>
             {navItems.map((item) => (
               <button
