@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, MapPin, Calendar, AlertCircle, Package, ScanSearch, ShieldAlert } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Card } from '@/app/components/ui/card';
@@ -14,6 +14,8 @@ import { translateEventType, translateProductType, useI18n } from '@/app/lib/i18
 
 export function VerifyPage() {
   const { code = '' } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useI18n();
   const [data, setData] = useState<any>(null);
   const [err, setErr] = useState<string>('');
@@ -44,15 +46,27 @@ export function VerifyPage() {
     }));
   }, [data, t]);
 
+  const backTo = (location.state as { backTo?: string } | null)?.backTo;
+
+  function handleBack() {
+    if (backTo) {
+      navigate(backTo);
+      return;
+    }
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate('/');
+  }
+
   return (
     <div className="min-h-screen animate-fade-in bg-gradient-to-b from-blue-50 via-white to-teal-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/80 backdrop-blur-sm dark:border-slate-800 dark:bg-slate-950/70">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-          <Button variant="ghost" asChild>
-            <Link to="/">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              {t('common.back')}
-            </Link>
+          <Button variant="ghost" onClick={handleBack}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            {t('common.back')}
           </Button>
           <div className="flex items-center gap-2">
             <ThemeToggle />
