@@ -11,7 +11,7 @@ export function LanguageToggle() {
       variant="outline"
       size="sm"
       onClick={() => setLang(lang === 'en' ? 'ar' : 'en')}
-      className="gap-2 bg-background/70"
+      className="gap-2 border-slate-300 bg-background/70 dark:border-slate-700 dark:bg-slate-900/50"
     >
       <Globe className="h-4 w-4" />
       {t('lang.switch')}

@@ -63,6 +63,17 @@ export function LandingPage() {
               </span>
             </div>
             <div className="flex items-center gap-2">
+              <Button asChild size="sm" variant="outline" className="hidden border-slate-300 dark:border-slate-700 dark:bg-slate-900/50 sm:inline-flex">
+                <Link to="/admin">
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  {t('landing.hero.admin')}
+                </Link>
+              </Button>
+              <Button asChild size="icon" variant="outline" className="border-slate-300 dark:border-slate-700 dark:bg-slate-900/50 sm:hidden">
+                <Link to="/admin" aria-label={t('landing.hero.admin')}>
+                  <BarChart3 className="h-4 w-4" />
+                </Link>
+              </Button>
               <ThemeToggle />
               <LanguageToggle />
             </div>
@@ -81,17 +92,12 @@ export function LandingPage() {
               <Button
                 size="lg"
                 onClick={() => setShowScanner(true)}
-                className="relative overflow-hidden bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/30 hover:from-blue-700 hover:to-blue-800 dark:from-blue-500 dark:to-blue-600"
+                aria-label={t('landing.hero.scan')}
+                className="relative mx-auto h-24 w-24 overflow-hidden rounded-full bg-gradient-to-r from-blue-600 to-blue-700 p-0 text-white shadow-xl shadow-blue-500/40 transition-transform hover:scale-105 hover:from-blue-700 hover:to-blue-800 active:scale-95 dark:from-blue-500 dark:to-blue-600 sm:mx-0 sm:h-14 sm:w-auto sm:px-6"
               >
-                <span className="absolute inset-0 animate-pulse rounded-md bg-white/10" />
-                <QrCode className="mr-2 h-5 w-5" />
-                {t('landing.hero.scan')}
-              </Button>
-              <Button asChild size="lg" variant="outline" className="border-slate-300 dark:border-slate-700 dark:bg-slate-900/50">
-                <Link to="/admin">
-                  <BarChart3 className="mr-2 h-5 w-5" />
-                  {t('landing.hero.admin')}
-                </Link>
+                <span className="pointer-events-none absolute inset-0 animate-pulse rounded-full bg-white/10" />
+                <QrCode className="h-10 w-10 sm:mr-2 sm:h-5 sm:w-5" />
+                <span className="hidden sm:inline">{t('landing.hero.scan')}</span>
               </Button>
             </div>
           </div>
@@ -207,7 +213,10 @@ export function LandingPage() {
             setShowScanner(false);
             navigate(`/verify/${code}`);
           }}
-          onClose={() => setShowScanner(false)}
+          onClose={() => {
+            setShowScanner(false);
+            navigate('/', { replace: true });
+          }}
         />
       )}
     </div>
