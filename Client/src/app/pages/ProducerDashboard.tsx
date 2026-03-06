@@ -120,7 +120,12 @@ function DashboardShell() {
             <div className="flex items-center gap-2">
               <ThemeToggle />
               <LanguageToggle />
-              <Button asChild variant="outline" size="sm">
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="border-slate-300 bg-background/70 dark:border-slate-700 dark:bg-slate-900/50"
+              >
                 <Link to="/">{t('common.exit')}</Link>
               </Button>
             </div>
