@@ -180,11 +180,6 @@ export function LandingPage() {
               <h4 className="mb-4 font-semibold">{t('landing.footer.links')}</h4>
               <ul className="space-y-2 text-slate-400">
                 <li>
-                  <Link to="/verify/LBL-HNY-NIZ-001" className="transition-colors hover:text-white">
-                    {t('landing.footer.verify')}
-                  </Link>
-                </li>
-                <li>
                   <Link to="/admin" className="transition-colors hover:text-white">
                     {t('landing.footer.admin')}
                   </Link>
