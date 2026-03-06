@@ -88,12 +88,7 @@ const i18nDict: Record<Lang, Dict> = {
 
     'dashboard.title': 'Trace-to-Trust Admin',
     'dashboard.panel': 'Admin Panel',
-    'dashboard.panelDesc': 'Official Blue/Teal UI',
     'dashboard.loginTitle': 'Admin Login',
-    'dashboard.loginDesc': 'Enter admin password to access dashboard APIs.',
-    'dashboard.password': 'Password',
-    'dashboard.unlock': 'Unlock',
-    'dashboard.wrongPassword': 'Wrong password',
     'dashboard.overview': 'Admin Overview',
     'dashboard.totalScans': 'Total Scans',
     'dashboard.batches': 'Batches',
@@ -239,7 +234,6 @@ const i18nDict: Record<Lang, Dict> = {
 
     'dashboard.title': 'إدارة تتبع للثقة',
     'dashboard.panel': 'لوحة الإدارة',
-    'dashboard.panelDesc': 'واجهة رسمية بالأزرق والفيروزي',
     'dashboard.loginTitle': 'تسجيل دخول الإدارة',
     'dashboard.loginDesc': 'أدخل كلمة مرور الإدارة للوصول إلى واجهات لوحة التحكم.',
     'dashboard.password': 'كلمة المرور',
