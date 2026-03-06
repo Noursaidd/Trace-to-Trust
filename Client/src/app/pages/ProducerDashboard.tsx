@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import {
   LayoutDashboard,
   Package,
@@ -52,6 +52,8 @@ const EVENT_TYPES = [
   'QUALITY_TEST',
 ];
 
+const TAB_IDS = ['overview', 'batches', 'create', 'events', 'sign', 'labels', 'revoke'] as const;
+
 type BatchRow = any;
 
 type AdminStats = {
@@ -69,7 +71,11 @@ export function ProducerDashboard() {
 
 function DashboardShell() {
   const { t } = useI18n();
-  const [activeTab, setActiveTab] = useState('overview');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(
+    initialTab && TAB_IDS.includes(initialTab as (typeof TAB_IDS)[number]) ? initialTab : 'overview'
+  );
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const navItems = [
@@ -81,6 +87,21 @@ function DashboardShell() {
     { id: 'labels', label: t('nav.labels'), icon: QrCode },
     { id: 'revoke', label: t('nav.revoke'), icon: AlertTriangle },
   ];
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && TAB_IDS.includes(tab as (typeof TAB_IDS)[number]) && tab !== activeTab) {
+      setActiveTab(tab);
+    }
+  }, [activeTab, searchParams]);
+
+  function selectTab(tabId: string) {
+    setActiveTab(tabId);
+    setSidebarOpen(false);
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', tabId);
+    setSearchParams(next, { replace: true });
+  }
 
   return (
     <div className="min-h-screen animate-fade-in bg-slate-50 dark:bg-slate-950">
@@ -125,10 +146,7 @@ function DashboardShell() {
             {navItems.map((item) => (
               <button
                 key={item.id}
-                onClick={() => {
-                  setActiveTab(item.id);
-                  setSidebarOpen(false);
-                }}
+                onClick={() => selectTab(item.id)}
                 className={cn(
                   'w-full rounded-xl px-4 py-3 text-left transition-all',
                   'flex items-center gap-3',
@@ -193,6 +211,7 @@ function OverviewInner({ stats, setStats }: { stats: AdminStats | null; setStats
 
 function AllBatchesTab() {
   const { t } = useI18n();
+  const location = useLocation();
   const [batches, setBatches] = useState<BatchRow[]>([]);
   const [filterType, setFilterType] = useState<string>('ALL');
 
@@ -258,7 +277,10 @@ function AllBatchesTab() {
                 <TableCell>
                   {b.sample_label_code ? (
                     <Button size="sm" variant="outline" asChild>
-                      <Link to={`/verify/${b.sample_label_code}`}>
+                      <Link
+                        to={`/verify/${b.sample_label_code}`}
+                        state={{ backTo: `${location.pathname}?tab=batches` }}
+                      >
                         <Eye className="mr-1 h-3 w-3" />
                         {t('dashboard.verifyLabel')}
                       </Link>
