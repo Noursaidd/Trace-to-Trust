@@ -312,6 +312,26 @@ const i18nDict: Record<Lang, Dict> = {
   },
 };
 
+Object.assign(i18nDict.en, {
+  'common.cancel': 'Cancel',
+  'dashboard.editing': 'Editing',
+  'dashboard.editBatch': 'Edit Batch',
+  'dashboard.editBatchDesc': 'Update batch details and save changes directly from this table.',
+  'dashboard.updateBatch': 'Update',
+  'dashboard.batchUpdated': 'Batch updated successfully.',
+  'dashboard.revokePrompt': 'Enter a reason for revoking this batch (optional):',
+});
+
+Object.assign(i18nDict.ar, {
+  'common.cancel': 'إلغاء',
+  'dashboard.editing': 'التعديل',
+  'dashboard.editBatch': 'تعديل الدفعة',
+  'dashboard.editBatchDesc': 'حدّث بيانات الدفعة واحفظ التغييرات مباشرة من الجدول.',
+  'dashboard.updateBatch': 'تحديث',
+  'dashboard.batchUpdated': 'تم تحديث الدفعة بنجاح.',
+  'dashboard.revokePrompt': 'أدخل سبب إلغاء هذه الدفعة (اختياري):',
+});
+
 type I18nContextValue = {
   lang: Lang;
   setLang: (lang: Lang) => void;

@@ -139,6 +139,72 @@ app.get('/api/batches/:id', asyncHandler(async (req, res) => {
   res.json({ success: true, batch, events, labels });
 }));
 
+app.patch('/api/batches/:id', asyncHandler(async (req, res) => {
+  const batch = await productsCollection.findOne({ id: req.params.id });
+  if (!batch) {
+    return res.status(404).json({ success: false, error: 'BATCH_NOT_FOUND' });
+  }
+
+  const body = req.body || {};
+  const updates = {};
+
+  if (Object.prototype.hasOwnProperty.call(body, 'product_name')) {
+    const value = String(body.product_name || '').trim();
+    if (!value) {
+      return res.status(400).json({ success: false, error: 'INVALID_PRODUCT_NAME' });
+    }
+    updates.product_name = value;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'product_type')) {
+    const value = String(body.product_type || '').trim();
+    if (!value) {
+      return res.status(400).json({ success: false, error: 'INVALID_PRODUCT_TYPE' });
+    }
+    updates.product_type = value;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'origin_region')) {
+    const value = String(body.origin_region || '').trim();
+    updates.origin_region = value || null;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'quantity')) {
+    if (body.quantity === '' || body.quantity === null || body.quantity === undefined) {
+      updates.quantity = null;
+    } else {
+      const qty = Number(body.quantity);
+      if (Number.isNaN(qty)) {
+        return res.status(400).json({ success: false, error: 'INVALID_QUANTITY' });
+      }
+      updates.quantity = qty;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'production_date')) {
+    const value = String(body.production_date || '').trim();
+    updates.production_date = value || null;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'expiry_date')) {
+    const value = String(body.expiry_date || '').trim();
+    updates.expiry_date = value || null;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'description')) {
+    const value = String(body.description || '').trim();
+    updates.description = value || null;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ success: false, error: 'NO_UPDATES' });
+  }
+
+  await productsCollection.updateOne({ id: batch.id }, { $set: updates });
+  const updatedBatch = await productsCollection.findOne({ id: batch.id });
+  res.json({ success: true, batch: updatedBatch });
+}));
+
 app.post('/api/batches/:id/events', asyncHandler(async (req, res) => {
   const batch = await productsCollection.findOne({ id: req.params.id });
   if (!batch) {

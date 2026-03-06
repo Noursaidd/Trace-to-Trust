@@ -17,6 +17,8 @@ import {
   ScanLine,
   TrendingUp,
   Search,
+  Pencil,
+  Ban,
 } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Card } from '@/app/components/ui/card';
@@ -26,6 +28,7 @@ import { Label } from '@/app/components/ui/label';
 import { Textarea } from '@/app/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/app/components/ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
 import { StatsCard } from '@/app/components/shared/StatsCard';
 import { LanguageToggle } from '@/app/components/shared/LanguageToggle';
 import { ThemeToggle } from '@/app/components/shared/ThemeToggle';
@@ -226,6 +229,20 @@ function AllBatchesTab() {
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [filterAction, setFilterAction] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [actionMessage, setActionMessage] = useState('');
+  const [actionError, setActionError] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editForm, setEditForm] = useState<{
+    id: string;
+    product_name: string;
+    product_type: string;
+    origin_region: string;
+    quantity: string;
+    production_date: string;
+    expiry_date: string;
+    description: string;
+  } | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -252,10 +269,16 @@ function AllBatchesTab() {
   }, []);
 
   const typeOptions = useMemo(() => {
-    return Array.from(new Set(batches.map((b) => String(b.product_type || '').trim()).filter(Boolean))).sort((a, b) =>
-      a.localeCompare(b)
-    );
+    return Array.from(new Set(batches.map((b) => String(b.product_type || '').trim()).filter(Boolean)))
+      .filter((type) => type.toUpperCase() !== 'TEST')
+      .sort((a, b) => a.localeCompare(b));
   }, [batches]);
+
+  useEffect(() => {
+    if (filterType !== 'ALL' && !typeOptions.includes(filterType)) {
+      setFilterType('ALL');
+    }
+  }, [filterType, typeOptions]);
 
   const originOptions = OMAN_WILAYAT;
 
@@ -285,11 +308,81 @@ function AllBatchesTab() {
 
   const num = useMemo(() => new Intl.NumberFormat(dir === 'rtl' ? 'ar' : 'en-US'), [dir]);
 
+  function openEdit(batch: any) {
+    setActionMessage('');
+    setActionError(false);
+    setEditForm({
+      id: batch.id,
+      product_name: batch.product_name || '',
+      product_type: batch.product_type || '',
+      origin_region: batch.origin_region || '',
+      quantity: batch.quantity === null || batch.quantity === undefined ? '' : String(batch.quantity),
+      production_date: batch.production_date || '',
+      expiry_date: batch.expiry_date || '',
+      description: batch.description || '',
+    });
+    setEditOpen(true);
+  }
+
+  async function saveBatchEdit() {
+    if (!editForm) return;
+    setEditSaving(true);
+    setActionMessage('');
+    setActionError(false);
+
+    try {
+      const payload = {
+        product_name: editForm.product_name,
+        product_type: editForm.product_type,
+        origin_region: editForm.origin_region,
+        quantity: editForm.quantity === '' ? null : Number(editForm.quantity),
+        production_date: editForm.production_date || null,
+        expiry_date: editForm.expiry_date || null,
+        description: editForm.description || null,
+      };
+
+      const r = await api.updateBatch(editForm.id, payload);
+      setBatches((prev) => prev.map((b) => (b.id === r.batch.id ? { ...b, ...r.batch } : b)));
+      setEditOpen(false);
+      setEditForm(null);
+      setActionMessage(t('dashboard.batchUpdated'));
+    } catch (e: any) {
+      setActionError(true);
+      setActionMessage(`${t('common.error')}: ${e?.body?.error || e.message}`);
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function revokeBatchFromTable(batch: any) {
+    if (batch.revoked) return;
+    const reason = window.prompt(t('dashboard.revokePrompt'));
+    if (reason === null) return;
+
+    setActionMessage('');
+    setActionError(false);
+
+    try {
+      const r = await api.revokeBatch(batch.id, reason);
+      setBatches((prev) => prev.map((b) => (b.id === r.batch.id ? { ...b, ...r.batch } : b)));
+      setActionMessage(t('revoke.ok'));
+    } catch (e: any) {
+      setActionError(true);
+      setActionMessage(`${t('common.error')}: ${e?.body?.error || e.message}`);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-4">
         <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">{t('nav.batches')}</h1>
       </div>
+
+      {actionMessage && (
+        <p className={cn('text-sm', actionError ? 'text-rose-600 dark:text-rose-300' : 'text-emerald-600 dark:text-emerald-300')}>
+          {actionMessage}
+        </p>
+      )}
 
       <Card className="rounded-2xl border-slate-200 bg-white/85 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -404,6 +497,7 @@ function AllBatchesTab() {
               <TableHead className="text-center">{t('dashboard.table.labels')}</TableHead>
               <TableHead className="text-center">{t('common.status')}</TableHead>
               <TableHead className="text-center">{t('common.actions')}</TableHead>
+              <TableHead className="text-center">{t('dashboard.editing')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -446,25 +540,47 @@ function AllBatchesTab() {
                     <span className="text-xs text-slate-500 dark:text-slate-400">{t('dashboard.noLabels')}</span>
                   )}
                 </TableCell>
+                <TableCell className="text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={() => openEdit(b)}
+                      aria-label={t('dashboard.editBatch')}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={() => revokeBatchFromTable(b)}
+                      disabled={b.revoked}
+                      aria-label={t('revoke.submit')}
+                      className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:text-rose-300 dark:hover:bg-rose-950/30"
+                    >
+                      <Ban className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
               </TableRow>
             ))}
             {loading && (
               <TableRow>
-                <TableCell colSpan={7} className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                <TableCell colSpan={8} className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
                   {t('common.loading')}
                 </TableCell>
               </TableRow>
             )}
             {!loading && loadError && (
               <TableRow>
-                <TableCell colSpan={7} className="py-8 text-center text-sm text-rose-600 dark:text-rose-300">
+                <TableCell colSpan={8} className="py-8 text-center text-sm text-rose-600 dark:text-rose-300">
                   {loadError}
                 </TableCell>
               </TableRow>
             )}
             {!loading && !loadError && filteredBatches.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                <TableCell colSpan={8} className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
                   <p>{t('common.noData')}</p>
                 </TableCell>
               </TableRow>
@@ -472,6 +588,98 @@ function AllBatchesTab() {
           </TableBody>
         </Table>
       </Card>
+
+      <Dialog
+        open={editOpen}
+        onOpenChange={(open) => {
+          if (!editSaving) {
+            setEditOpen(open);
+            if (!open) setEditForm(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{t('dashboard.editBatch')}</DialogTitle>
+            <DialogDescription>{t('dashboard.editBatchDesc')}</DialogDescription>
+          </DialogHeader>
+
+          {editForm && (
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label>{t('create.productName')}</Label>
+                  <Input
+                    value={editForm.product_name}
+                    onChange={(e) => setEditForm({ ...editForm, product_name: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label>{t('create.productType')}</Label>
+                  <Input
+                    value={editForm.product_type}
+                    onChange={(e) => setEditForm({ ...editForm, product_type: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label>{t('create.origin')}</Label>
+                  <Input
+                    value={editForm.origin_region}
+                    onChange={(e) => setEditForm({ ...editForm, origin_region: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label>{t('create.quantity')}</Label>
+                  <Input
+                    type="number"
+                    value={editForm.quantity}
+                    onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label>{t('create.productionDate')}</Label>
+                  <Input
+                    type="date"
+                    value={editForm.production_date}
+                    onChange={(e) => setEditForm({ ...editForm, production_date: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label>{t('create.expiryDate')}</Label>
+                  <Input
+                    type="date"
+                    value={editForm.expiry_date}
+                    onChange={(e) => setEditForm({ ...editForm, expiry_date: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label>{t('create.description')}</Label>
+                <Textarea
+                  rows={4}
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={editSaving}>
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={saveBatchEdit} disabled={!editForm || editSaving}>
+              {t('dashboard.updateBatch')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

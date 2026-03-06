@@ -27,6 +27,11 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   }),
+  updateBatch: (id: string, data: any) => apiFetch(`/api/batches/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }),
   getBatch: (id: string) => apiFetch(`/api/batches/${encodeURIComponent(id)}`),
   addEvent: (batchId: string, data: any) => apiFetch(`/api/batches/${encodeURIComponent(batchId)}/events`, {
     method: 'POST',
@@ -38,6 +43,11 @@ export const api = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ count }),
+  }),
+  revokeBatch: (id: string, reason: string) => apiFetch(`/api/batches/${encodeURIComponent(id)}/revoke`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
   }),
   verify: (code: string) => apiFetch(`/api/verify/${encodeURIComponent(code)}`),
 }
