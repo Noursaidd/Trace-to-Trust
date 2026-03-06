@@ -16,6 +16,7 @@ import {
   XCircle,
   ScanLine,
   TrendingUp,
+  Search,
 } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Card } from '@/app/components/ui/card';
@@ -215,58 +216,209 @@ function OverviewInner({ stats, setStats }: { stats: AdminStats | null; setStats
 }
 
 function AllBatchesTab() {
-  const { t } = useI18n();
+  const { t, dir } = useI18n();
   const location = useLocation();
   const [batches, setBatches] = useState<BatchRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [filterType, setFilterType] = useState<string>('ALL');
+  const [filterOrigin, setFilterOrigin] = useState<string>('ALL');
+  const [filterStatus, setFilterStatus] = useState<string>('ALL');
+  const [filterAction, setFilterAction] = useState<string>('ALL');
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   useEffect(() => {
-    api.listBatches(filterType === 'ALL' ? undefined : filterType).then((r) => setBatches(r.batches));
-  }, [filterType]);
+    let mounted = true;
+    setLoading(true);
+    setLoadError('');
+    api
+      .listBatches()
+      .then((r) => {
+        if (!mounted) return;
+        setBatches(r.batches);
+      })
+      .catch((e: any) => {
+        if (!mounted) return;
+        setLoadError(e?.body?.error || e?.message || 'Failed to load batches');
+      })
+      .finally(() => {
+        if (!mounted) return;
+        setLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const typeOptions = useMemo(() => {
+    return Array.from(new Set(batches.map((b) => String(b.product_type || '').trim()).filter(Boolean))).sort((a, b) =>
+      a.localeCompare(b)
+    );
+  }, [batches]);
+
+  const originOptions = OMAN_WILAYAT;
+
+  const filteredBatches = useMemo(() => {
+    return batches.filter((b) => {
+      const query = searchTerm.toLowerCase();
+      const type = String(b.product_type || '').trim();
+      const origin = String(b.origin_region || '').trim();
+      const revoked = Boolean(b.revoked);
+      const hasVerifyAction = Boolean(b.sample_label_code);
+      const searchable = [b.id, b.product_name, b.product_type, b.origin_region]
+        .filter(Boolean)
+        .map((v) => String(v).toLowerCase())
+        .join(' ');
+
+      if (filterType !== 'ALL' && type !== filterType) return false;
+      if (filterOrigin !== 'ALL' && origin !== filterOrigin) return false;
+      if (filterStatus === 'ACTIVE' && revoked) return false;
+      if (filterStatus === 'REVOKED' && !revoked) return false;
+      if (filterAction === 'VERIFY_LABEL' && !hasVerifyAction) return false;
+      if (filterAction === 'NO_LABELS' && hasVerifyAction) return false;
+      if (query && !searchable.includes(query)) return false;
+
+      return true;
+    });
+  }, [batches, filterAction, filterOrigin, filterStatus, filterType, searchTerm]);
+
+  const num = useMemo(() => new Intl.NumberFormat(dir === 'rtl' ? 'ar' : 'en-US'), [dir]);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">{t('nav.batches')}</h1>
-        <div className="w-64">
-          <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger>
-              <SelectValue placeholder={t('dashboard.filterType')} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">{t('common.all')}</SelectItem>
-              {PRODUCT_TYPES.map((pt) => (
-                <SelectItem key={pt.value} value={pt.value}>
-                  {t(pt.key)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
       </div>
+
+      <Card className="rounded-2xl border-slate-200 bg-white/85 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('dashboard.filters.title')}</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{t('dashboard.filters.desc')}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge className="border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300">
+              {`${t('dashboard.filters.shown')} ${num.format(filteredBatches.length)} / ${num.format(batches.length)}`}
+            </Badge>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-slate-600 dark:text-slate-300">{t('dashboard.table.type')}</p>
+            <Select value={filterType} onValueChange={setFilterType}>
+              <SelectTrigger>
+                <SelectValue placeholder={t('dashboard.table.type')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">{t('common.all')}</SelectItem>
+                {typeOptions.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {translateProductType(type, t)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-slate-600 dark:text-slate-300">{t('dashboard.table.origin')}</p>
+            <Select value={filterOrigin} onValueChange={setFilterOrigin}>
+              <SelectTrigger>
+                <SelectValue placeholder={t('dashboard.table.origin')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">{t('common.all')}</SelectItem>
+                {originOptions.map((origin) => (
+                  <SelectItem key={origin} value={origin}>
+                    {origin}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-slate-600 dark:text-slate-300">{t('common.status')}</p>
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger>
+                <SelectValue placeholder={t('common.status')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">{t('common.all')}</SelectItem>
+                <SelectItem value="ACTIVE">{t('dashboard.active')}</SelectItem>
+                <SelectItem value="REVOKED">{t('dashboard.revokedBadge')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-slate-600 dark:text-slate-300">{t('common.actions')}</p>
+            <Select value={filterAction} onValueChange={setFilterAction}>
+              <SelectTrigger>
+                <SelectValue placeholder={t('common.actions')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">{t('common.all')}</SelectItem>
+                <SelectItem value="VERIFY_LABEL">{t('dashboard.verifyLabel')}</SelectItem>
+                <SelectItem value="NO_LABELS">{t('dashboard.noLabels')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="w-full sm:max-w-lg">
+            <p className="mb-1 text-xs font-medium text-slate-600 dark:text-slate-300">{t('common.search')}</p>
+            <div className="relative">
+              <Search
+                className={cn(
+                  'pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400',
+                  dir === 'rtl' ? 'right-3' : 'left-3',
+                )}
+              />
+              <Input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className={cn(dir === 'rtl' ? 'pr-9 text-right' : 'pl-9')}
+                placeholder={t('dashboard.searchPh')}
+              />
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <Card className="overflow-x-auto rounded-2xl border-slate-200 bg-white/85 p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
         <Table>
           <TableHeader>
             <TableRow className="bg-slate-100/80 dark:bg-slate-900">
-              <TableHead>{t('dashboard.table.id')}</TableHead>
-              <TableHead>{t('dashboard.table.product')}</TableHead>
-              <TableHead>{t('dashboard.table.type')}</TableHead>
-              <TableHead>{t('dashboard.table.origin')}</TableHead>
-              <TableHead>{t('dashboard.table.labels')}</TableHead>
-              <TableHead>{t('common.status')}</TableHead>
-              <TableHead>{t('common.actions')}</TableHead>
+              <TableHead className={cn('w-[24%]', dir === 'rtl' ? 'text-right' : 'text-left')}>
+                {t('dashboard.table.id')}
+              </TableHead>
+              <TableHead className={cn('w-[20%]', dir === 'rtl' ? 'text-right' : 'text-left')}>
+                {t('dashboard.table.product')}
+              </TableHead>
+              <TableHead className="text-center">{t('dashboard.table.type')}</TableHead>
+              <TableHead className="text-center">{t('dashboard.table.origin')}</TableHead>
+              <TableHead className="text-center">{t('dashboard.table.labels')}</TableHead>
+              <TableHead className="text-center">{t('common.status')}</TableHead>
+              <TableHead className="text-center">{t('common.actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {batches.map((b, i) => (
+            {!loading &&
+              !loadError &&
+              filteredBatches.map((b, i) => (
               <TableRow key={b.id} className={cn(i % 2 === 0 ? 'bg-white dark:bg-slate-900/50' : 'bg-slate-50/70 dark:bg-slate-950/40', 'hover:bg-blue-50/70 dark:hover:bg-slate-800')}>
-                <TableCell className="font-mono text-xs">{b.id}</TableCell>
-                <TableCell>{b.product_name}</TableCell>
-                <TableCell>{translateProductType(b.product_type, t)}</TableCell>
-                <TableCell>{b.origin_region || '—'}</TableCell>
-                <TableCell>{b.label_count ?? 0}</TableCell>
-                <TableCell>
+                <TableCell className={cn('font-mono text-xs ltr', dir === 'rtl' ? 'text-right' : 'text-left')}>
+                  {b.id}
+                </TableCell>
+                <TableCell className={cn(dir === 'rtl' ? 'text-right' : 'text-left')}>{b.product_name}</TableCell>
+                <TableCell className="text-center">{translateProductType(b.product_type, t)}</TableCell>
+                <TableCell className="text-center">{b.origin_region || '-'}</TableCell>
+                <TableCell className="text-center tabular-nums">{b.label_count ?? 0}</TableCell>
+                <TableCell className="text-center">
                   {b.revoked ? (
                     <Badge className="border-rose-300 bg-rose-100 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
                       <XCircle className="mr-1 h-3 w-3" />
@@ -279,7 +431,7 @@ function AllBatchesTab() {
                     </Badge>
                   )}
                 </TableCell>
-                <TableCell>
+                <TableCell className="text-center">
                   {b.sample_label_code ? (
                     <Button size="sm" variant="outline" asChild>
                       <Link
@@ -296,6 +448,27 @@ function AllBatchesTab() {
                 </TableCell>
               </TableRow>
             ))}
+            {loading && (
+              <TableRow>
+                <TableCell colSpan={7} className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                  {t('common.loading')}
+                </TableCell>
+              </TableRow>
+            )}
+            {!loading && loadError && (
+              <TableRow>
+                <TableCell colSpan={7} className="py-8 text-center text-sm text-rose-600 dark:text-rose-300">
+                  {loadError}
+                </TableCell>
+              </TableRow>
+            )}
+            {!loading && !loadError && filteredBatches.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={7} className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                  <p>{t('common.noData')}</p>
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </Card>
@@ -729,3 +902,4 @@ function RevokeBatchTab() {
     </div>
   );
 }
+
