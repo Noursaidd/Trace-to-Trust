@@ -65,6 +65,12 @@ export function VerifyPage() {
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
             <Card className="rounded-2xl border-slate-200 bg-white/85 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
+              {data && !loading && (
+                <div className="mb-4">
+                  <VerificationBadge status={badgeStatus} size="sm" />
+                </div>
+              )}
+
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">{t('verify.title')}</h1>
@@ -138,8 +144,6 @@ export function VerifyPage() {
           </div>
 
           <div className="space-y-6">
-            <VerificationBadge status={badgeStatus} size="lg" />
-
             {status === 'revoked' && (
               <Card className="rounded-2xl border-rose-300 bg-rose-50 p-6 dark:border-rose-800 dark:bg-rose-950/30">
                 <h3 className="mb-2 font-bold text-rose-800 dark:text-rose-300">{t('verify.revoked')}</h3>
