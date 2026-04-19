@@ -1,11 +1,12 @@
 {
   "name": "trace-to-trust-server",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
     "dev": "node index.js",
     "start": "node index.js",
+    "seed": "node scripts/seed.js",
     "test:smoke": "node tests/smoke.js"
   },
   "dependencies": {

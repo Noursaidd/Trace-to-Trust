@@ -1,0 +1,25 @@
+{
+  "name": "trace-to-trust",
+  "version": "0.2.0",
+  "private": true,
+  "workspaces": [
+    "Client",
+    "Server"
+  ],
+  "engines": {
+    "node": ">=20 <25"
+  },
+  "optionalDependencies": {
+    "@esbuild/linux-x64": "0.25.12",
+    "@rollup/rollup-linux-x64-gnu": "4.57.1",
+    "@tailwindcss/oxide-linux-x64-gnu": "4.1.12",
+    "lightningcss-linux-x64-gnu": "1.30.1"
+  },
+  "scripts": {
+    "build": "npm run build --workspace=Client",
+    "dev:client": "npm run dev --workspace=Client",
+    "dev:server": "npm run dev --workspace=Server",
+    "seed": "npm run seed --workspace=Server",
+    "test:smoke": "npm run test:smoke --workspace=Server"
+  }
+}
