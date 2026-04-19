@@ -36,9 +36,8 @@ const i18nDict: Record<Lang, Dict> = {
     'product.Fish': 'Fish',
 
     'landing.hero.title': 'Verify Local Products in Oman',
-    'landing.hero.desc': 'Ensure authenticity and traceability of Omani products through blockchain-powered verification',
+    'landing.hero.desc': 'Ensure authenticity and traceability of Omani products through secure digital verification',
     'landing.hero.scan': 'Scan QR Code',
-    'landing.hero.admin': 'Admin Dashboard',
     'landing.stats.producers': 'Trusted by 240+ producers',
     'landing.stats.labels': '1.2M+ QR labels verified',
     'landing.stats.wilayat': 'Coverage across 11 wilayat',
@@ -54,7 +53,6 @@ const i18nDict: Record<Lang, Dict> = {
     'landing.footer.desc': 'Ensuring authenticity of local Omani products through digital verification',
     'landing.footer.links': 'Quick Links',
     'landing.footer.verify': 'Verify Product',
-    'landing.footer.admin': 'Admin Portal',
     'landing.footer.contact': 'Contact',
     'landing.footer.location': 'Muscat, Oman',
     'landing.footer.rights': '© 2026 Trace-to-Trust. All rights reserved.',
@@ -90,6 +88,12 @@ const i18nDict: Record<Lang, Dict> = {
     'dashboard.title': 'Trace-to-Trust Admin',
     'dashboard.panel': 'Admin Panel',
     'dashboard.loginTitle': 'Admin Login',
+    'dashboard.loginDesc': 'Enter the admin password to continue.',
+    'dashboard.password': 'Password',
+    'dashboard.unlock': 'Unlock',
+    'dashboard.logout': 'Log out',
+    'dashboard.wrongPassword': 'Incorrect password.',
+    'dashboard.passwordMissing': 'Admin password is not configured.',
     'dashboard.overview': 'Admin Overview',
     'dashboard.totalScans': 'Total Scans',
     'dashboard.batches': 'Batches',
@@ -187,9 +191,8 @@ const i18nDict: Record<Lang, Dict> = {
     'product.Fish': 'أسماك',
 
     'landing.hero.title': 'تحقق من المنتجات المحلية في عُمان',
-    'landing.hero.desc': 'اضمن أصالة المنتجات العُمانية وإمكانية تتبعها عبر التحقق المدعوم بالبلوك تشين',
+    'landing.hero.desc': 'اضمن أصالة المنتجات العُمانية وإمكانية تتبعها عبر التحقق الرقمي الآمن',
     'landing.hero.scan': 'مسح رمز QR',
-    'landing.hero.admin': 'لوحة التحكم',
     'landing.stats.producers': 'موثوق من أكثر من 240 منتجًا',
     'landing.stats.labels': 'أكثر من 1.2 مليون ملصق QR تم التحقق منه',
     'landing.stats.wilayat': 'تغطية عبر 11 ولاية',
@@ -205,7 +208,6 @@ const i18nDict: Record<Lang, Dict> = {
     'landing.footer.desc': 'ضمان أصالة المنتجات العُمانية المحلية عبر التحقق الرقمي',
     'landing.footer.links': 'روابط سريعة',
     'landing.footer.verify': 'التحقق من المنتج',
-    'landing.footer.admin': 'بوابة الإدارة',
     'landing.footer.contact': 'تواصل معنا',
     'landing.footer.location': 'مسقط، عُمان',
     'landing.footer.rights': '© 2026 تتبع للثقة. جميع الحقوق محفوظة.',
@@ -320,6 +322,7 @@ Object.assign(i18nDict.en, {
   'dashboard.updateBatch': 'Update',
   'dashboard.batchUpdated': 'Batch updated successfully.',
   'dashboard.revokePrompt': 'Enter a reason for revoking this batch (optional):',
+  'dashboard.passwordMissing': 'Admin password is not configured.',
 });
 
 Object.assign(i18nDict.ar, {
@@ -330,6 +333,8 @@ Object.assign(i18nDict.ar, {
   'dashboard.updateBatch': 'تحديث',
   'dashboard.batchUpdated': 'تم تحديث الدفعة بنجاح.',
   'dashboard.revokePrompt': 'أدخل سبب إلغاء هذه الدفعة (اختياري):',
+  'dashboard.logout': 'تسجيل الخروج',
+  'dashboard.passwordMissing': 'لم يتم إعداد كلمة مرور الإدارة.',
 });
 
 type I18nContextValue = {

@@ -70,10 +70,108 @@ type AdminStats = {
 };
 
 export function ProducerDashboard() {
-  return <DashboardShell />;
+  return <AdminGate />;
 }
 
-function DashboardShell() {
+function AdminGate() {
+  const { t } = useI18n();
+  const [checking, setChecking] = useState(true);
+  const [authenticated, setAuthenticated] = useState(false);
+  const [password, setPassword] = useState('');
+  const [message, setMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    api
+      .adminSession()
+      .then((r) => {
+        if (mounted) setAuthenticated(Boolean(r.authenticated));
+      })
+      .catch(() => {
+        if (mounted) setAuthenticated(false);
+      })
+      .finally(() => {
+        if (mounted) setChecking(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setMessage('');
+    setSubmitting(true);
+    try {
+      await api.adminLogin(password);
+      setAuthenticated(true);
+      setPassword('');
+    } catch (err: any) {
+      setMessage(err?.body?.error === 'ADMIN_PASSWORD_NOT_CONFIGURED' ? t('dashboard.passwordMissing') : t('dashboard.wrongPassword'));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function logout() {
+    await api.adminLogout().catch(() => null);
+    setAuthenticated(false);
+    setPassword('');
+    setMessage('');
+  }
+
+  if (checking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 dark:bg-slate-950">
+        <Card className="w-full max-w-md rounded-2xl border-slate-200 bg-white/90 p-6 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900/90">
+          <ShieldCheck className="mx-auto mb-3 h-10 w-10 text-blue-600 dark:text-blue-400" />
+          <p className="text-slate-700 dark:text-slate-300">{t('common.loading')}</p>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!authenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-blue-50 via-white to-teal-50 px-4 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <Card className="w-full max-w-md rounded-2xl border-slate-200 bg-white/95 p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900/95">
+          <div className="mb-6 text-center">
+            <ShieldCheck className="mx-auto mb-3 h-12 w-12 text-blue-600 dark:text-blue-400" />
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{t('dashboard.loginTitle')}</h1>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{t('dashboard.loginDesc')}</p>
+          </div>
+          <form className="space-y-4" onSubmit={submit}>
+            <div className="space-y-2">
+              <Label htmlFor="admin-password">{t('dashboard.password')}</Label>
+              <Input
+                id="admin-password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+            {message && <p className="text-sm text-rose-600 dark:text-rose-300">{message}</p>}
+            <Button className="w-full bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400" type="submit" disabled={!password || submitting}>
+              {submitting ? t('common.loading') : t('dashboard.unlock')}
+            </Button>
+          </form>
+          <div className="mt-4 text-center">
+            <Link to="/" className="text-sm text-slate-600 transition-colors hover:text-slate-900 dark:text-slate-300 dark:hover:text-white">
+              {t('common.exit')}
+            </Link>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  return <DashboardShell onLogout={logout} />;
+}
+
+function DashboardShell({ onLogout }: { onLogout: () => void }) {
   const { t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab');
@@ -124,6 +222,14 @@ function DashboardShell() {
             <div className="flex items-center gap-2">
               <ThemeToggle />
               <LanguageToggle />
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-slate-300 bg-background/70 dark:border-slate-700 dark:bg-slate-900/50"
+                onClick={onLogout}
+              >
+                {t('dashboard.logout')}
+              </Button>
               <Button
                 asChild
                 variant="outline"
@@ -1059,18 +1165,10 @@ function RevokeBatchTab() {
   async function revoke() {
     setMsg('');
     try {
-      const r = await fetch(`/api/batches/${encodeURIComponent(batchId)}/revoke`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ reason }),
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j?.error || 'HTTP_ERROR');
+      await api.revokeBatch(batchId, reason);
       setMsg(t('revoke.ok'));
     } catch (e: any) {
-      setMsg(`${t('common.error')}: ${e.message}`);
+      setMsg(`${t('common.error')}: ${e?.body?.error || e.message}`);
     }
   }
 

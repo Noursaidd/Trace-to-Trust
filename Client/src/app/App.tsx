@@ -14,8 +14,8 @@ export default function App() {
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/verify/:code" element={<VerifyPage />} />
-            <Route path="/admin" element={<ProducerDashboard />} />
-            <Route path="/dashboard" element={<ProducerDashboard />} />
+            <Route path="/trust-ops" element={<ProducerDashboard />} />
+            <Route path="*" element={<LandingPage />} />
           </Routes>
         </BrowserRouter>
       </I18nProvider>

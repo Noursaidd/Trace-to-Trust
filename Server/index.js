@@ -1,8 +1,6 @@
 const fs = require('fs');
 const path = require('path');
- const dns = require('dns');
- dns.setDefaultResultOrder('verbatim');
-dns.setServers(['1.1.1.1', '8.8.8.8', '8.8.4.4']);
+const dns = require('dns');
 const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');
@@ -11,10 +9,18 @@ const { MongoClient } = require('mongodb');
 const { v4: uuidv4 } = require('uuid');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
+if (!process.env.VERCEL) {
+  dns.setDefaultResultOrder('verbatim');
+  dns.setServers(['1.1.1.1', '8.8.8.8', '8.8.4.4']);
+}
+
 const PORT = Number(process.env.PORT || 3000);
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
 const MONGO_DB_NAME = process.env.MONGO_DB_NAME || 'tracetotrust';
 const KEYS_PATH = process.env.KEYS_PATH || path.join(__dirname, 'keys.json');
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+const ADMIN_COOKIE_NAME = 'trace_admin_session';
+const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
 
 const COLLECTIONS = {
   products: 'Products',
@@ -23,14 +29,34 @@ const COLLECTIONS = {
 };
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
 let productsCollection;
 let eventsCollection;
 let labelsCollection;
+let mongoClient;
+let mongoClientPromise;
+
+function envKey(name) {
+  const b64 = process.env[`${name}_B64`];
+  if (b64) return Buffer.from(b64, 'base64').toString('utf8');
+  return process.env[name];
+}
 
 function loadOrCreateKeys() {
+  const publicKeyPem = envKey('SIGNING_PUBLIC_KEY_PEM');
+  const privateKeyPem = envKey('SIGNING_PRIVATE_KEY_PEM');
+  if (publicKeyPem && privateKeyPem) {
+    return {
+      algorithm: 'ed25519',
+      publicKeyPem,
+      privateKeyPem,
+      createdAt: process.env.SIGNING_KEY_CREATED_AT || 'environment'
+    };
+  }
+
   if (fs.existsSync(KEYS_PATH)) {
     return JSON.parse(fs.readFileSync(KEYS_PATH, 'utf8'));
   }
@@ -42,6 +68,11 @@ function loadOrCreateKeys() {
     privateKeyPem: privateKey.export({ format: 'pem', type: 'pkcs8' }),
     createdAt: new Date().toISOString()
   };
+
+  if (process.env.VERCEL) {
+    console.warn('SIGNING_* env vars are not set; generated an ephemeral signing key for this function instance.');
+    return keys;
+  }
 
   fs.writeFileSync(KEYS_PATH, JSON.stringify(keys, null, 2));
   return keys;
@@ -66,6 +97,95 @@ const keys = loadOrCreateKeys();
 const privateKey = crypto.createPrivateKey(keys.privateKeyPem);
 const publicKey = crypto.createPublicKey(keys.publicKeyPem);
 
+function parseCookies(cookieHeader = '') {
+  return cookieHeader.split(';').reduce((acc, part) => {
+    const [rawName, ...rawValue] = part.trim().split('=');
+    if (!rawName) return acc;
+    acc[rawName] = decodeURIComponent(rawValue.join('=') || '');
+    return acc;
+  }, {});
+}
+
+function safeEqualString(a, b) {
+  const aBuf = Buffer.from(String(a || ''), 'utf8');
+  const bBuf = Buffer.from(String(b || ''), 'utf8');
+  if (aBuf.length !== bBuf.length) return false;
+  return crypto.timingSafeEqual(aBuf, bBuf);
+}
+
+function isAdminPasswordValid(password) {
+  return Boolean(ADMIN_PASSWORD) && safeEqualString(password, ADMIN_PASSWORD);
+}
+
+function signAdminPayload(payload) {
+  return crypto.createHmac('sha256', keys.privateKeyPem).update(payload).digest('base64url');
+}
+
+function createAdminToken() {
+  const payload = Buffer.from(JSON.stringify({
+    exp: Date.now() + ADMIN_SESSION_MAX_AGE_SECONDS * 1000,
+    nonce: crypto.randomUUID()
+  })).toString('base64url');
+  return `${payload}.${signAdminPayload(payload)}`;
+}
+
+function verifyAdminToken(token) {
+  if (!token || !token.includes('.')) return false;
+  const [payload, signature] = token.split('.');
+  if (!safeEqualString(signature, signAdminPayload(payload))) return false;
+
+  try {
+    const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    return Number(decoded.exp) > Date.now();
+  } catch {
+    return false;
+  }
+}
+
+function hasAdminAccess(req) {
+  const headerPassword = req.get('x-admin-password');
+  if (isAdminPasswordValid(headerPassword)) return true;
+
+  const cookies = parseCookies(req.get('cookie') || '');
+  return verifyAdminToken(cookies[ADMIN_COOKIE_NAME]);
+}
+
+function setAdminCookie(res, token) {
+  res.cookie(ADMIN_COOKIE_NAME, token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: Boolean(process.env.VERCEL),
+    maxAge: ADMIN_SESSION_MAX_AGE_SECONDS * 1000,
+    path: '/'
+  });
+}
+
+function clearAdminCookie(res) {
+  res.clearCookie(ADMIN_COOKIE_NAME, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: Boolean(process.env.VERCEL),
+    path: '/'
+  });
+}
+
+function requireAdmin(req, res, next) {
+  if (!ADMIN_PASSWORD) {
+    return res.status(503).json({ success: false, error: 'ADMIN_PASSWORD_NOT_CONFIGURED' });
+  }
+
+  if (!hasAdminAccess(req)) {
+    return res.status(401).json({ success: false, error: 'ADMIN_AUTH_REQUIRED' });
+  }
+
+  return next();
+}
+
+app.use('/api', asyncHandler(async (_req, _res, next) => {
+  await ensureDatabase();
+  next();
+}));
+
 function signBytes(buf) {
   return crypto.sign(null, buf, privateKey).toString('base64');
 }
@@ -82,7 +202,30 @@ app.get('/api/health', (_req, res) => {
   res.json({ success: true, ok: true });
 });
 
-app.post('/api/batches', asyncHandler(async (req, res) => {
+app.post('/api/admin/login', asyncHandler(async (req, res) => {
+  if (!ADMIN_PASSWORD) {
+    return res.status(503).json({ success: false, error: 'ADMIN_PASSWORD_NOT_CONFIGURED' });
+  }
+
+  const password = String(req.body?.password || '');
+  if (!isAdminPasswordValid(password)) {
+    return res.status(401).json({ success: false, error: 'INVALID_ADMIN_PASSWORD' });
+  }
+
+  setAdminCookie(res, createAdminToken());
+  res.json({ success: true, authenticated: true });
+}));
+
+app.get('/api/admin/session', (req, res) => {
+  res.json({ success: true, authenticated: hasAdminAccess(req) });
+});
+
+app.post('/api/admin/logout', (_req, res) => {
+  clearAdminCookie(res);
+  res.json({ success: true, authenticated: false });
+});
+
+app.post('/api/batches', requireAdmin, asyncHandler(async (req, res) => {
   const body = req.body || {};
   const id = uuidv4();
 
@@ -109,7 +252,7 @@ app.post('/api/batches', asyncHandler(async (req, res) => {
   res.json({ success: true, batch: doc });
 }));
 
-app.get('/api/batches', asyncHandler(async (req, res) => {
+app.get('/api/batches', requireAdmin, asyncHandler(async (req, res) => {
   const { product_type } = req.query;
   const query = product_type ? { product_type } : {};
   const batches = await productsCollection.find(query).sort({ created_at: -1 }).toArray();
@@ -128,7 +271,7 @@ app.get('/api/batches', asyncHandler(async (req, res) => {
   res.json({ success: true, batches: withCounts });
 }));
 
-app.get('/api/batches/:id', asyncHandler(async (req, res) => {
+app.get('/api/batches/:id', requireAdmin, asyncHandler(async (req, res) => {
   const batch = await productsCollection.findOne({ id: req.params.id });
   if (!batch) {
     return res.status(404).json({ success: false, error: 'NOT_FOUND' });
@@ -139,7 +282,7 @@ app.get('/api/batches/:id', asyncHandler(async (req, res) => {
   res.json({ success: true, batch, events, labels });
 }));
 
-app.patch('/api/batches/:id', asyncHandler(async (req, res) => {
+app.patch('/api/batches/:id', requireAdmin, asyncHandler(async (req, res) => {
   const batch = await productsCollection.findOne({ id: req.params.id });
   if (!batch) {
     return res.status(404).json({ success: false, error: 'BATCH_NOT_FOUND' });
@@ -205,7 +348,7 @@ app.patch('/api/batches/:id', asyncHandler(async (req, res) => {
   res.json({ success: true, batch: updatedBatch });
 }));
 
-app.post('/api/batches/:id/events', asyncHandler(async (req, res) => {
+app.post('/api/batches/:id/events', requireAdmin, asyncHandler(async (req, res) => {
   const batch = await productsCollection.findOne({ id: req.params.id });
   if (!batch) {
     return res.status(404).json({ success: false, error: 'BATCH_NOT_FOUND' });
@@ -235,7 +378,7 @@ app.post('/api/batches/:id/events', asyncHandler(async (req, res) => {
   res.json({ success: true, event });
 }));
 
-app.post('/api/events/:id/sign', asyncHandler(async (req, res) => {
+app.post('/api/events/:id/sign', requireAdmin, asyncHandler(async (req, res) => {
   const event = await eventsCollection.findOne({ id: req.params.id });
   if (!event) {
     return res.status(404).json({ success: false, error: 'EVENT_NOT_FOUND' });
@@ -259,7 +402,7 @@ app.post('/api/events/:id/sign', asyncHandler(async (req, res) => {
   });
 }));
 
-app.post('/api/batches/:id/labels', asyncHandler(async (req, res) => {
+app.post('/api/batches/:id/labels', requireAdmin, asyncHandler(async (req, res) => {
   const batch = await productsCollection.findOne({ id: req.params.id });
   if (!batch) {
     return res.status(404).json({ success: false, error: 'BATCH_NOT_FOUND' });
@@ -353,7 +496,7 @@ app.get('/api/verify/:code', asyncHandler(async (req, res) => {
   });
 }));
 
-app.post('/api/batches/:id/revoke', asyncHandler(async (req, res) => {
+app.post('/api/batches/:id/revoke', requireAdmin, asyncHandler(async (req, res) => {
   const batch = await productsCollection.findOne({ id: req.params.id });
   if (!batch) {
     return res.status(404).json({ success: false, error: 'BATCH_NOT_FOUND' });
@@ -369,7 +512,7 @@ app.post('/api/batches/:id/revoke', asyncHandler(async (req, res) => {
   res.json({ success: true, batch: updatedBatch });
 }));
 
-app.get('/api/admin/stats', asyncHandler(async (_req, res) => {
+app.get('/api/admin/stats', requireAdmin, asyncHandler(async (_req, res) => {
   const totalBatches = await productsCollection.countDocuments();
   const totalLabels = await labelsCollection.countDocuments();
   const totalEvents = await eventsCollection.countDocuments();
@@ -397,9 +540,21 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ success: false, error: 'INTERNAL_SERVER_ERROR' });
 });
 
-async function startServer() {
-  const client = new MongoClient(MONGO_URI);
-  await client.connect();
+async function ensureDatabase() {
+  if (productsCollection && eventsCollection && labelsCollection) {
+    return {
+      productsCollection,
+      eventsCollection,
+      labelsCollection
+    };
+  }
+
+  if (!mongoClientPromise) {
+    mongoClient = new MongoClient(MONGO_URI);
+    mongoClientPromise = mongoClient.connect();
+  }
+
+  const client = await mongoClientPromise;
   console.log('Connected to MongoDB');
 
   const db = client.db(MONGO_DB_NAME);
@@ -416,6 +571,15 @@ async function startServer() {
     labelsCollection.createIndex({ batch_id: 1 })
   ]);
 
+  return {
+    productsCollection,
+    eventsCollection,
+    labelsCollection
+  };
+}
+
+async function startServer() {
+  await ensureDatabase();
   app.listen(PORT, () => {
     console.log(`Trace-to-Trust backend running on http://localhost:${PORT}`);
     console.log(`MongoDB Database: ${MONGO_DB_NAME}`);
@@ -423,7 +587,17 @@ async function startServer() {
   });
 }
 
-startServer().catch((error) => {
-  console.error('Failed to connect to MongoDB:', error);
-  process.exit(1);
-});
+if (require.main === module) {
+  startServer().catch((error) => {
+    console.error('Failed to connect to MongoDB:', error);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  app,
+  ensureDatabase,
+  canonicalize,
+  signBytes,
+  verifyBytes
+};

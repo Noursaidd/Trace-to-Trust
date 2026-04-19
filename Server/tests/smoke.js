@@ -1,5 +1,29 @@
-const BASE_URL = process.env.API_BASE || 'http://127.0.0.1:3000';
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+const dns = require('dns');
+const { MongoClient } = require('mongodb');
+
+dns.setDefaultResultOrder('verbatim');
+dns.setServers(['1.1.1.1', '8.8.8.8', '8.8.4.4']);
+
+const BASE_URL = process.env.API_BASE || 'http://localhost:3000';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ibrahim123';
+
+async function cleanupSmokeBatch(batchId) {
+  if (!batchId || !process.env.MONGO_URI || process.env.SKIP_SMOKE_CLEANUP === '1') return;
+
+  const client = new MongoClient(process.env.MONGO_URI);
+  await client.connect();
+  const db = client.db(process.env.MONGO_DB_NAME || 'tracetotrust');
+
+  await Promise.all([
+    db.collection('Products').deleteOne({ id: batchId, product_type: 'SMOKE_TEST' }),
+    db.collection('batch_events').deleteMany({ batch_id: batchId }),
+    db.collection('labels').deleteMany({ batch_id: batchId })
+  ]);
+
+  await client.close();
+}
 
 async function getJson(path, init = {}) {
   const res = await fetch(`${BASE_URL}${path}`, init);
@@ -20,6 +44,8 @@ async function getJson(path, init = {}) {
 }
 
 async function main() {
+  let batchId = '';
+
   const health = await getJson('/api/health');
   if (!health?.success) {
     throw new Error('health endpoint did not return success');
@@ -42,7 +68,7 @@ async function main() {
     })
   });
 
-  const batchId = createBatch?.batch?.id;
+  batchId = createBatch?.batch?.id;
   if (!batchId) {
     throw new Error('failed to create batch');
   }
@@ -91,6 +117,7 @@ async function main() {
   console.log('Smoke test passed.');
   console.log(`Batch: ${batchId}`);
   console.log(`Label: ${code}`);
+  await cleanupSmokeBatch(batchId);
 }
 
 main().catch((err) => {

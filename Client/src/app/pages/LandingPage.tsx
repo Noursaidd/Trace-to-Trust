@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { BarChart3, FileCheck, Package, QrCode, ShieldCheck, MapPin } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { FileCheck, Package, QrCode, ShieldCheck, MapPin } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { QrScanner } from '@/app/components/shared/QrScanner';
 import { Card } from '@/app/components/ui/card';
@@ -63,17 +63,6 @@ export function LandingPage() {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <Button asChild size="sm" variant="outline" className="hidden border-slate-300 dark:border-slate-700 dark:bg-slate-900/50 sm:inline-flex">
-                <Link to="/admin">
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  {t('landing.hero.admin')}
-                </Link>
-              </Button>
-              <Button asChild size="icon" variant="outline" className="border-slate-300 dark:border-slate-700 dark:bg-slate-900/50 sm:hidden">
-                <Link to="/admin" aria-label={t('landing.hero.admin')}>
-                  <BarChart3 className="h-4 w-4" />
-                </Link>
-              </Button>
               <ThemeToggle />
               <LanguageToggle />
             </div>
@@ -174,23 +163,13 @@ export function LandingPage() {
 
       <footer className="bg-slate-900 py-12 text-white">
         <div className="container mx-auto px-4">
-          <div className="grid gap-8 md:grid-cols-3">
+          <div className="grid gap-8 md:grid-cols-2">
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-6 w-6" />
                 <span className="text-xl font-bold">{t('app.name')}</span>
               </div>
               <p className="text-slate-400">{t('landing.footer.desc')}</p>
-            </div>
-            <div>
-              <h4 className="mb-4 font-semibold">{t('landing.footer.links')}</h4>
-              <ul className="space-y-2 text-slate-400">
-                <li>
-                  <Link to="/admin" className="transition-colors hover:text-white">
-                    {t('landing.footer.admin')}
-                  </Link>
-                </li>
-              </ul>
             </div>
             <div>
               <h4 className="mb-4 font-semibold">{t('landing.footer.contact')}</h4>

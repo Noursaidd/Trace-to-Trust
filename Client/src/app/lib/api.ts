@@ -3,7 +3,7 @@ async function apiFetch(path: string, opts: RequestInit = {}) {
     ...(opts.headers as any),
   }
 
-  const res = await fetch(path, { ...opts, headers })
+  const res = await fetch(path, { credentials: 'same-origin', ...opts, headers })
   const text = await res.text()
   let json: any = null
   try {
@@ -19,6 +19,13 @@ async function apiFetch(path: string, opts: RequestInit = {}) {
 
 export const api = {
   health: () => apiFetch('/api/health'),
+  adminLogin: (password: string) => apiFetch('/api/admin/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  }),
+  adminSession: () => apiFetch('/api/admin/session'),
+  adminLogout: () => apiFetch('/api/admin/logout', { method: 'POST' }),
   adminStats: () => apiFetch('/api/admin/stats'),
   listBatches: (product_type?: string) =>
     apiFetch(product_type ? `/api/batches?product_type=${encodeURIComponent(product_type)}` : '/api/batches'),
