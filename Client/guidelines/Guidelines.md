@@ -1,61 +1,36 @@
-**Add your own guidelines here**
-<!--
+# Trace-to-Trust Project Guidelines
 
-System Guidelines
+## Product Scope
 
-Use this file to provide the AI with rules and guidelines you want it to follow.
-This template outlines a few examples of things you can add. You can add your own sections and format it to suit your needs
+- Keep the project focused on product traceability for Omani goods: honey, frankincense, dates, and fish.
+- Prioritize implemented behavior over aspirational copy. If a screen says a capability exists, connect it to the API or label it as future work.
+- Use `/verify/:code` as the primary consumer experience and `/trust-ops` as the private producer/admin experience.
 
-TIP: More context isn't always better. It can confuse the LLM. Try and add the most important rules you need
+## Data And API Rules
 
-# General guidelines
+- Use the backend API in `Server/index.js` for all product, event, label, verification, and stats data.
+- Keep QR labels unique per item. Seed labels should use stable, readable public-style codes.
+- Preserve event integrity fields: `payload_json`, `payload_hash`, `signature`, and `signed_at`.
+- Do not commit secrets, Atlas credentials, or signing keys. Use `.env`, `.env.local`, or Vercel environment variables.
 
-Any general rules you want the AI to follow.
-For example:
+## UI Rules
 
-* Only use absolute positioning when necessary. Opt for responsive and well structured layouts that use flexbox and grid by default
-* Refactor code as you go to keep code clean
-* Keep file sizes small and put helper functions and components in their own files.
+- Keep the interface bilingual-ready and route-safe; avoid hardcoded navigation that bypasses React Router.
+- Keep important actions visible on mobile: scan, create batch, add event, sign event, generate label, revoke.
+- Verification status must be understandable without reading technical details.
+- Use the existing Tailwind, Radix UI, shadcn-style components, and app tokens before adding new UI dependencies.
 
---------------
+## Deployment Rules
 
-# Design system guidelines
-Rules for how the AI should make generations look like your company's design system
+- The Vercel deployment is rooted at the repository root, not inside `Client`.
+- The Vite client builds to `Client/dist`; API requests stay same-origin under `/api/*`.
+- The Express API is exported through `api/index.js` for Vercel and still runs locally with `npm run dev --workspace=Server`.
+- Required Vercel environment variables: `MONGO_URI`, `MONGO_DB_NAME`, `ADMIN_PASSWORD`, and stable signing key variables.
+- Do not link the admin console from the public landing page. The direct path is `/trust-ops`, and it must stay password-protected.
 
-Additionally, if you select a design system to use in the prompt box, you can reference
-your design system's components, tokens, variables and components.
-For example:
+## Quality Bar
 
-* Use a base font-size of 14px
-* Date formats should always be in the format “Jun 10”
-* The bottom toolbar should only ever have a maximum of 4 items
-* Never use the floating action button with the bottom toolbar
-* Chips should always come in sets of 3 or more
-* Don't use a dropdown if there are 2 or fewer options
-
-You can also create sub sections and add more specific details
-For example:
-
-
-## Button
-The Button component is a fundamental interactive element in our design system, designed to trigger actions or navigate
-users through the application. It provides visual feedback and clear affordances to enhance user experience.
-
-### Usage
-Buttons should be used for important actions that users need to take, such as form submissions, confirming choices,
-or initiating processes. They communicate interactivity and should have clear, action-oriented labels.
-
-### Variants
-* Primary Button
-  * Purpose : Used for the main action in a section or page
-  * Visual Style : Bold, filled with the primary brand color
-  * Usage : One primary button per section to guide users toward the most important action
-* Secondary Button
-  * Purpose : Used for alternative or supporting actions
-  * Visual Style : Outlined with the primary color, transparent background
-  * Usage : Can appear alongside a primary button for less important actions
-* Tertiary Button
-  * Purpose : Used for the least important actions
-  * Visual Style : Text-only with no border, using primary color
-  * Usage : For actions that should be available but not emphasized
--->
+- Run `npm run build` from the root before deployment.
+- Run the seed script only when sample data is needed: `npm run seed`.
+- Verify the consumer flow with a real label code, especially `/verify/OM-HNY-SIDR-2026-001`.
+- Keep sample data idempotent so rerunning the seed script does not create duplicate batches or labels.

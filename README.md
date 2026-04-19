@@ -54,6 +54,8 @@ Verification status returned by the backend is one of:
 
 - `Client/` frontend app (public landing, scanner, verify page, producer dashboard)
 - `Server/` Express API and MongoDB integration
+- `api/index.js` Vercel function entrypoint that serves the Express API
+- `vercel.json` Vercel build, output, and single-page-app routing configuration
 
 ## Data model
 
@@ -98,16 +100,27 @@ Create `Server/.env`:
 MONGO_URI=mongodb+srv://<username>:<password>@<cluster-host>/
 MONGO_DB_NAME=tracetotrust
 PORT=3000
+ADMIN_PASSWORD=<admin-password>
 ```
 
 Notes:
 
 - `MONGO_URI` should not include a database path at the end.
 - `MONGO_DB_NAME` must be exactly `tracetotrust` if you want this project DB.
+- Local signing keys are loaded from `Server/keys.json` when present. For Vercel, use stable signing-key environment variables instead of relying on a filesystem key file.
 
 ### 2) Install dependencies
 
-Backend:
+From the repository root:
+
+```powershell
+cd "C:\Users\user\Desktop\Ongoing Projects\trace_to_trust\Trace-to-Trust"
+npm install
+```
+
+You can still install a workspace directly when needed.
+
+Backend only:
 
 ```powershell
 cd "C:\Users\user\Desktop\Ongoing Projects\trace_to_trust\Trace-to-Trust\Server"
@@ -151,16 +164,66 @@ Proxy behavior:
 - Default backend target is `http://localhost:3000`.
 - Optional override in client env: `VITE_API_TARGET`.
 
+### 5) Seed sample data
+
+The seed script creates four sample batches, signed journey events, and stable QR label codes without duplicating records on reruns:
+
+```powershell
+cd "C:\Users\user\Desktop\Ongoing Projects\trace_to_trust\Trace-to-Trust"
+npm run seed
+```
+
+Primary verification path:
+
+- `/verify/OM-HNY-SIDR-2026-001`
+
+Other seeded labels:
+
+- `/verify/OM-FRK-DHOFAR-2026-001`
+- `/verify/OM-DAT-NIZWA-2026-001`
+- `/verify/OM-FSH-SUR-2026-001`
+
+## Deploy to Vercel
+
+The deploy root is the repository root. Vercel builds the Vite client from `Client/` and serves the Express API through `api/index.js`.
+
+Required Vercel environment variables:
+
+```env
+MONGO_URI=<MongoDB Atlas connection string>
+MONGO_DB_NAME=tracetotrust
+ADMIN_PASSWORD=<admin-password>
+SIGNING_PUBLIC_KEY_PEM_B64=<base64 PEM public key>
+SIGNING_PRIVATE_KEY_PEM_B64=<base64 PEM private key>
+SIGNING_KEY_CREATED_AT=<optional ISO timestamp>
+```
+
+Recommended production deploy:
+
+```powershell
+cd "C:\Users\user\Desktop\Ongoing Projects\trace_to_trust\Trace-to-Trust"
+npm run build
+vercel --prod
+```
+
+The deployed app should use same-origin API calls like `/api/health`, `/api/batches`, and `/api/verify/:code`.
+
 ## How to use the app
 
 ### Producer flow
 
-1. Open `http://localhost:8080/admin`.
-2. Create a batch.
-3. Add one or more events to the batch.
-4. Sign events (for integrity verification).
-5. Generate labels.
-6. Open label PNG links to get QR images for printing.
+The admin dashboard is not linked from the public landing page. Open the private admin path directly and enter the configured admin password:
+
+- Local: `http://localhost:8080/trust-ops`
+- Production: `https://trace-to-trust.vercel.app/trust-ops`
+
+After login:
+
+1. Create a batch.
+2. Add one or more events to the batch.
+3. Sign events (for integrity verification).
+4. Generate labels.
+5. Open label PNG links to get QR images for printing.
 
 ### Consumer flow
 
@@ -185,6 +248,7 @@ Verification endpoint:
 - Event payload is canonicalized and hashed (`sha256`).
 - Signature validation uses the stored public key.
 - A high scan count is flagged as suspicious.
+- Admin API routes require the configured `ADMIN_PASSWORD` through an HTTP-only session cookie or the `x-admin-password` header for smoke tests.
 
 ## Troubleshooting
 
@@ -222,7 +286,8 @@ npm run test:smoke
 
 ## Future improvements
 
-- Server-side auth enforcement for admin endpoints.
+- Role-based admin accounts instead of a single shared admin password.
 - Barcode (Code128) endpoint in addition to QR.
 - Better indexing and query optimization for large-scale data.
-- Role-based access and audit trails.
+- Tamper-evident audit trails for admin operations.
+- Production-grade observability for API errors, verification events, and suspicious scan spikes.
